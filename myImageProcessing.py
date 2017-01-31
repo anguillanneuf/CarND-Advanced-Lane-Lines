@@ -11,7 +11,6 @@ import cv2
 import numpy as np
 from scipy import signal
 
-
 # load camera calibration matrix and distortion coefficients.   
 myCalibration = pickle.load(open("./output/myCalibration.p", "rb"))
 
@@ -103,13 +102,13 @@ def sliding_window_method(warped, δh=64, δv=72):
 
     while y > 0:
         # Zoom into the left and right sliding windows. 
-        bbox_left = warped[(y-δv):y, np.clip((mlx-δh),0,1280):(mlx+δh)]
-        bbox_right = warped[(y-δv):y, (mrx-δh):np.clip((mrx+δh),0,1280)]
+        bbox_left = warped[(y-δv):y, np.clip((mlx-δh),0,1280):np.clip((mlx+δh),0,1280)]
+        bbox_right = warped[(y-δv):y, np.clip((mrx-δh),0,1280):np.clip((mrx+δh),0,1280)]
         
         
         # Update `lane_pts` based on sliding windows, where pixel values=255.  
-        lane_pts[(y-δv):y, np.clip((mlx-δh),0,1280):(mlx+δh)][(bbox_left==255)] = 1
-        lane_pts[(y-δv):y, (mrx-δh):np.clip((mrx+δh),0,1280)][(bbox_right==255)] = 1
+        lane_pts[(y-δv):y, np.clip((mlx-δh),0,1280):np.clip((mlx+δh),0,1280)][(bbox_left==255)] = 1
+        lane_pts[(y-δv):y, np.clip((mrx-δh),0,1280):np.clip((mrx+δh),0,1280)][(bbox_right==255)] = 1
         
         # Use new histogram to find lane lines, where there is the highest
         # concentration of pixels. 
@@ -123,10 +122,10 @@ def sliding_window_method(warped, δh=64, δv=72):
         
         # If peaks are found, update sliding window centers. 
         if len(peakind_left)>0:
-            mlx = int(np.clip(peakind_left[0]+mlx-δh/2,0,w/2))
+            mlx = int(np.clip(peakind_left[0]+mlx-δh,0,w/2))
 
         if len(peakind_right)>0:
-            mrx = int(np.clip(peakind_right[0]+mrx-δh/2,w/2,w))
+            mrx = int(np.clip(peakind_right[0]+mrx-δh,w/2,w))
 
         # Shift sliding window upward until it hits the top of the image. 
         y -= δv
@@ -158,7 +157,7 @@ def calcCurv(v, fit):
   
 
 
-def findingCurvature(lane_slidingwindowed, y_arr=y_arr):
+def findCurvature(lane_slidingwindowed, y_arr=y_arr):
     '''
     `lane_slidingwindowed`: this is the most clean version of the bird's eye 
                             view of the lane lines. 
@@ -204,16 +203,29 @@ def findingCurvature(lane_slidingwindowed, y_arr=y_arr):
     # Determine the distance that the car is off center in meters.
     offcenter = ((right_fitx[0]+left_fitx[0])/2-w/2)*(3.7/(w*(6/16)))
     
-    return (left_fitx, right_fitx, left_curverad, right_curverad, 
-            left_fit_r2, right_fit_r2, offcenter)
+    return (leftx, rightx, lefty, righty, left_fitx, right_fitx, left_curverad,
+            right_curverad, left_fit_r2, right_fit_r2, offcenter)
 
+
+    
+def drawCurves(lx, rx, ly, ry, lfx, rfx):
+    lane_detected = np.zeros((h,w,c))
+    
+    lane_detected[:,:,0][ly, lx] = 255
+    
+    lane_detected[:,:,1][np.hstack([y_arr-1]*10).astype(int), \
+    np.clip(np.hstack([lfx-2,lfx-1,lfx,lfx+1,lfx+2,rfx-2,rfx-1,rfx,rfx+1,rfx+2]).astype(int),0,1279)] = 255
+    
+    lane_detected[:,:,2][ry, rx] = 255
+    
+    return lane_detected
 
 
 def unwarping(lane_dst, lane_slidingwindowed):
     # Find curvature.
-    lfx,rfx,lc,rc,lr2,rr2,oc = findingCurvature(lane_slidingwindowed)
+    lx,rx,ly,ry,lfx,rfx,lc,rc,lr2,rr2,oc = findCurvature(lane_slidingwindowed)
     
-    warp_zero = np.zeros_like(lane_slidingwindowed).astype(np.uint8)
+    warp_zero = np.zeros_like(lane_slidingwindowed)
     color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
     
     # Draw a polygon using the fitted x and y values.
@@ -227,3 +239,27 @@ def unwarping(lane_dst, lane_slidingwindowed):
     lane_overlayed = cv2.addWeighted(lane_dst, 1, lane_unwarped, 0.3, 0)
     
     return lane_overlayed
+    
+    
+def createDiagScreen(diag1, diag2, diag3, diag4, diag5, info):
+    font = cv2.FONT_HERSHEY_COMPLEX
+    textpanel = np.zeros((120,1280,3),dtype=np.uint8)
+    
+    curvrad = np.mean([info['lc'], info['rc']])
+    mytext = "Estimated lane curvature: {:.2f}\
+    Estimated Meters left of center: {:.2f}\
+    R-squared left: {:.2f}\
+    R-squared right: {:.2f}".\
+    format(curvrad, info['oc'], info['lr2'], info['rr2'])
+              
+    cv2.putText(textpanel, mytext, (30,60), font, 0.5, (255,255,255), 1)
+    
+    diagScreen = np.zeros((840,1680,3), dtype=np.uint8)
+    diagScreen[0:720,0:1280] = diag1
+    diagScreen[720:840,0:1280] = textpanel
+    diagScreen[0:210,1280:1680] = cv2.resize(cv2.cvtColor(diag2, cv2.COLOR_GRAY2BGR), (400,210), interpolation=cv2.INTER_AREA)
+    diagScreen[210:420,1280:1680] = cv2.resize(cv2.cvtColor(diag3, cv2.COLOR_GRAY2BGR), (400,210), interpolation=cv2.INTER_AREA)
+    diagScreen[420:630,1280:1680] = cv2.resize(cv2.cvtColor(diag4, cv2.COLOR_GRAY2BGR), (400,210), interpolation=cv2.INTER_AREA)
+    diagScreen[630:840,1280:1680] = cv2.resize(diag5, (400,210), interpolation=cv2.INTER_AREA)
+
+    return diagScreen
