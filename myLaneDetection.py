@@ -8,11 +8,7 @@ Created on Mon Jan 30 17:16:40 2017
 # import myLineComponents as L
 import myImageProcessing as I
 import cv2
-import os
-# from moviepy.editor import VideoFileClip
-# import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-import glob
+from moviepy.editor import VideoFileClip
 
 
 
@@ -47,11 +43,11 @@ def process_image(lane_img):
 
 def main():
     
-#    project_video_output_fname = 'project_video_output.mp4'
-#    clip1 = VideoFileClip("project_video.mp4")
-#    project_video_output = clip1.fl_image(process_image)
-#    project_video_output.write_videofile(project_video_output_fname, 
-#                                         audio=False)
+    project_video_output_fname = 'project_video_output.mp4'
+    clip1 = VideoFileClip("project_video.mp4")
+    project_video_output = clip1.fl_image(process_image)
+    project_video_output.write_videofile(project_video_output_fname, 
+                                         audio=False)
     
 if __name__ == '__main__':
     main()

@@ -73,8 +73,22 @@ def find_lane_start(histogram):
     `histogram`: an 1-D array that keeps track of the number of pixels with 
                  a value of 1 along the y-axis. 
     '''
-    mid_left_start = np.clip(np.argmax(histogram[:int(w/2)]),1,640)
-    mid_right_start = np.clip(np.argmax(histogram[int(w/2):])+int(w/2),640,1279)
+    left_peaks = signal.find_peaks_cwt(histogram[:int(w/2)], np.arange(50,100))
+    valid_left_peaks = [x for x in left_peaks if histogram[x]>4500]
+    if len(valid_left_peaks) >0:
+        mid_left_start = valid_left_peaks[-1]
+    else:
+        mid_left_start = np.clip(np.argmax(histogram[:int(w/2)]),1,640)
+    
+    right_peaks = signal.find_peaks_cwt(histogram[int(w/2):], np.arange(50,100))
+    valid_right_peaks = [x for x in right_peaks if histogram[x+int(w/2)]>4500]
+    if len(valid_right_peaks) >0:
+        mid_right_start = valid_right_peaks[0]+int(w/2)
+    else:
+        mid_right_start = np.clip(np.argmax(histogram[int(w/2):])+int(w/2),640,1279)
+    
+#    mid_left_start = np.clip(np.argmax(histogram[:int(w/2)]),1,640)
+#    mid_right_start = np.clip(np.argmax(histogram[int(w/2):])+int(w/2),640,1279)
     
     # Returns the x-coordinates of the lanes at the bottom of an image. 
     return mid_left_start, mid_right_start
@@ -116,17 +130,18 @@ def sliding_window_method(warped, δh=64, δv=72):
         hist_left = np.sum(bbox_left, axis=0)
         hist_right = np.sum(bbox_right, axis=0)
         
-        # Define peaks to have a width between 10 and 30 pixels. 
-        peakind_left = signal.find_peaks_cwt(hist_left, np.arange(10,30))
-        peakind_right = signal.find_peaks_cwt(hist_right, np.arange(10,30))
+        # Define peaks to have a width between 60 and 100 pixels. 
+        peakind_left = signal.find_peaks_cwt(hist_left, np.arange(50,100))
+        peakind_right = signal.find_peaks_cwt(hist_right, np.arange(50,100))
 
         
         # If peaks are found, update sliding window centers. 
         # Choose peaks are closer to the center of the image. 
-        if len(peakind_left)>0:
+        # If the sliding window shows a high variance, less noisy data points, I make an update. 
+        if len(peakind_left)>0 and np.std(np.sum(bbox_left, axis=0)) >1000:
             mlx = int(np.clip(peakind_left[-1]+mlx-δh,0,w/2))
 
-        if len(peakind_right)>0:
+        if len(peakind_right)>0 and np.std(np.sum(bbox_right, axis=0)) >1000:
             mrx = int(np.clip(peakind_right[0]+mrx-δh,w/2,w))
 
         # Shift sliding window upward until it hits the top of the image. 
@@ -174,6 +189,12 @@ def findCurvature(lane_slidingwindowed, y_arr=y_arr):
     # Group the coordinates into left and right lanes. 
     leftx,lefty = xvals[xvals<=w/2],yvals[xvals<=w/2]
     rightx,righty = xvals[xvals>=w/2],yvals[xvals>=w/2]
+    if len(rightx)<1 or len(righty)<1:
+        rightx = [880, 880]
+        righty = [720, 0]
+    if len(leftx)<1 or len(lefty) <1:
+        leftx=[400,400]
+        lefty=[720,0]
     
 
     # Fit 2 degree polynomials, using y values as x inputs, as vice versa.
