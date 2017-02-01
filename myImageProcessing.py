@@ -73,8 +73,8 @@ def find_lane_start(histogram):
     `histogram`: an 1-D array that keeps track of the number of pixels with 
                  a value of 1 along the y-axis. 
     '''
-    mid_left_start = np.argmax(histogram[:int(w/2)])
-    mid_right_start = np.argmax(histogram[int(w/2):])+int(w/2)
+    mid_left_start = np.clip(np.argmax(histogram[:int(w/2)]),1,640)
+    mid_right_start = np.clip(np.argmax(histogram[int(w/2):])+int(w/2),640,1279)
     
     # Returns the x-coordinates of the lanes at the bottom of an image. 
     return mid_left_start, mid_right_start
@@ -102,13 +102,14 @@ def sliding_window_method(warped, δh=64, δv=72):
 
     while y > 0:
         # Zoom into the left and right sliding windows. 
-        bbox_left = warped[(y-δv):y, np.clip((mlx-δh),0,1280):np.clip((mlx+δh),0,1280)]
-        bbox_right = warped[(y-δv):y, np.clip((mrx-δh),0,1280):np.clip((mrx+δh),0,1280)]
+        # Clip them using the left, center, and right vertical lines. 
+        bbox_left = warped[(y-δv):y, np.clip((mlx-δh),1,639):np.clip((mlx+δh),1,639)]
+        bbox_right = warped[(y-δv):y, np.clip((mrx-δh),640,1279):np.clip((mrx+δh),640,1279)]
         
         
         # Update `lane_pts` based on sliding windows, where pixel values=255.  
-        lane_pts[(y-δv):y, np.clip((mlx-δh),0,1280):np.clip((mlx+δh),0,1280)][(bbox_left==255)] = 1
-        lane_pts[(y-δv):y, np.clip((mrx-δh),0,1280):np.clip((mrx+δh),0,1280)][(bbox_right==255)] = 1
+        lane_pts[(y-δv):y, np.clip((mlx-δh),1,639):np.clip((mlx+δh),1,639)][(bbox_left==255)] = 1
+        lane_pts[(y-δv):y, np.clip((mrx-δh),640,1279):np.clip((mrx+δh),640,1279)][(bbox_right==255)] = 1
         
         # Use new histogram to find lane lines, where there is the highest
         # concentration of pixels. 
@@ -121,8 +122,9 @@ def sliding_window_method(warped, δh=64, δv=72):
 
         
         # If peaks are found, update sliding window centers. 
+        # Choose peaks are closer to the center of the image. 
         if len(peakind_left)>0:
-            mlx = int(np.clip(peakind_left[0]+mlx-δh,0,w/2))
+            mlx = int(np.clip(peakind_left[-1]+mlx-δh,0,w/2))
 
         if len(peakind_right)>0:
             mrx = int(np.clip(peakind_right[0]+mrx-δh,w/2,w))
@@ -143,7 +145,7 @@ def calcR2(x, y, coeff):
     ssreg = np.sum((yhat-ybar)**2)
     sstot = np.sum((y - ybar)**2)
      
-    return 1.-ssreg / sstot
+    return ssreg / sstot
     
 
 # Calculate the fitted x values.
@@ -214,7 +216,7 @@ def drawCurves(lx, rx, ly, ry, lfx, rfx):
     lane_detected[:,:,0][ly, lx] = 255
     
     lane_detected[:,:,1][np.hstack([y_arr-1]*10).astype(int), \
-    np.clip(np.hstack([lfx-2,lfx-1,lfx,lfx+1,lfx+2,rfx-2,rfx-1,rfx,rfx+1,rfx+2]).astype(int),0,1279)] = 255
+    np.clip(np.hstack([lfx-2,lfx-1,lfx,lfx+1,lfx+2,rfx-2,rfx-1,rfx,rfx+1,rfx+2]).astype(int),1,1279)] = 255
     
     lane_detected[:,:,2][ry, rx] = 255
     
@@ -242,7 +244,7 @@ def unwarping(lane_dst, lane_slidingwindowed):
     
     
 def createDiagScreen(diag1, diag2, diag3, diag4, diag5, info):
-    font = cv2.FONT_HERSHEY_COMPLEX
+    font = cv2.FONT_HERSHEY_PLAIN
     textpanel = np.zeros((120,1280,3),dtype=np.uint8)
     
     curvrad = np.mean([info['lc'], info['rc']])
@@ -252,7 +254,7 @@ def createDiagScreen(diag1, diag2, diag3, diag4, diag5, info):
     R-squared right: {:.2f}".\
     format(curvrad, info['oc'], info['lr2'], info['rr2'])
               
-    cv2.putText(textpanel, mytext, (30,60), font, 0.5, (255,255,255), 1)
+    cv2.putText(textpanel, mytext, (30,60), font, 1, (255,255,255), 1)
     
     diagScreen = np.zeros((840,1680,3), dtype=np.uint8)
     diagScreen[0:720,0:1280] = diag1
