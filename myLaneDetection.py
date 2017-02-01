@@ -52,15 +52,6 @@ def main():
 #    project_video_output = clip1.fl_image(process_image)
 #    project_video_output.write_videofile(project_video_output_fname, 
 #                                         audio=False)
-
-    lane_images = glob.glob('./project_video_frames/*.jpeg')
-    
-    if not os.path.exists('./diag/'):
-        os.makedirs('./diag/')
-    
-    for s in lane_images:   
-        result = process_image(mpimg.imread(s))
-        mpimg.imsave('./diag/'+s[-20:], result)
     
 if __name__ == '__main__':
     main()
