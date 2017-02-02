@@ -7,7 +7,7 @@ Created on Mon Jan 30 17:05:14 2017
 """
 
 import numpy as np
-
+from collections import deque
 
 # Define a class to receive the characteristics of each line detection
 class Line():
@@ -16,12 +16,10 @@ class Line():
         self.detected = False
         
         # x values of the last n fits of the line
-        self.fx = [] 
+        self.fx = deque(maxlen=5)
         
-        #average x values of the fitted line over the last n iterations
-        self.bestx = None  
         #polynomial coefficients averaged over the last n iterations
-        self.best_fit = None
+        self.best_fit = deque(maxlen=5)
         
         #polynomial coefficients for the most recent fit
         self.coeffs = [np.array([False])]  
