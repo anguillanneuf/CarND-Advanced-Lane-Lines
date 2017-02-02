@@ -5,7 +5,7 @@ Created on Mon Jan 30 17:16:40 2017
 
 @author: tz
 """
-# import myLineComponents as L
+
 import myImageProcessing as I
 import cv2
 from moviepy.editor import VideoFileClip
@@ -28,6 +28,7 @@ def process_image(lane_img):
     lx,rx,ly,ry,lfx,rfx,lc,rc,lr2,rr2,oc= I.findCurvature(lane_slidingwindowed)
     info = {'lc':lc, 'rc': rc, 'lr2':lr2, 'rr2': rr2, 'oc': oc}
     
+    
     # diag5
     lane_detected = I.drawCurves(lx, rx, ly, ry, lfx, rfx)
 
@@ -38,8 +39,10 @@ def process_image(lane_img):
     diagScreen = I.createDiagScreen(lane_unwarped, lane_thresholded, 
                                   lane_warped, lane_slidingwindowed*255,
                                   lane_detected, info)
+    
     return diagScreen
  
+
 
 def main():
     
@@ -48,6 +51,9 @@ def main():
     project_video_output = clip1.fl_image(process_image)
     project_video_output.write_videofile(project_video_output_fname, 
                                          audio=False)
+
+    
+
     
 if __name__ == '__main__':
     main()
