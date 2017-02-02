@@ -267,11 +267,13 @@ def findCurvature(lane_slidingwindowed, y_arr=y_arr):
 
     right_fit = np.polyfit(righty, rightx, 2)
     right_fitx = calcFitx(y_arr, right_fit)
+    
 
     # If the distance between the left and right lane are consistent (small std)
     if(np.std(abs(left_fitx - right_fitx))) < 500 and \
       (np.mean(abs(left_fitx - right_fitx))) > w*(5.5/16) and \
-      (np.mean(abs(left_fitx - right_fitx))) < w*(6.5/16):
+      (np.mean(abs(left_fitx - right_fitx))) < w*(6.3/16):
+          
         L.fx.append(left_fitx)
         R.fx.append(right_fitx)
         L.detected = True
@@ -285,7 +287,7 @@ def findCurvature(lane_slidingwindowed, y_arr=y_arr):
     else: 
         left_bestx = np.mean(np.array(L.fx), axis=0)
         right_bestx = np.mean(np.array(R.fx), axis=0)
-        w_road = np.clip(np.mean(left_bestx - right_bestx), w*6/16, w*6.5/16)
+        w_road = np.clip(np.mean(left_bestx - right_bestx), w*5.9/16, w*6.3/16)
         # If the left lane is a better fit. 
 
         # diagnosis
@@ -338,11 +340,16 @@ def findCurvature(lane_slidingwindowed, y_arr=y_arr):
     L.oc = offcenter
     R.oc = offcenter
     
+    lfx = np.mean(np.array(L.fx), axis=0)
+    rfx = np.mean(np.array(R.fx), axis=0)
     
-    return (L.allx, R.allx, L.ally, R.ally, L.fx[-1], R.fx[-1], L.c, R.c, L.r2, R.r2, L.oc)
+    return (L.allx, R.allx, L.ally, R.ally, lfx, rfx, L.c, R.c, L.r2, R.r2, L.oc)
 
     
 def drawCurves(lx, rx, ly, ry, lfx, rfx):
+    
+
+    
     lane_detected = np.zeros((h,w,c))
     
     lane_detected[:,:,0][np.clip(ly.astype(int),0,719), np.clip(lx.astype(int),0,1279)] = 255

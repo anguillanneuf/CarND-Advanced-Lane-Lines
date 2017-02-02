@@ -24,7 +24,7 @@ class Line():
         #polynomial coefficients for the most recent fit
         self.coeffs = [np.array([False])]  
         #r squared of the best fit
-        self.r2 = None  
+        self.r2 = 1.0 
         
         #radius of curvature of the line in some units
         self.c = None 
