@@ -36,7 +36,7 @@ Files and Folders Used In the Project:
 |`myLineComponents.py`|Definition of class `Line`|
 |`project_video.mp4`|Raw video|
 |`project_video_output.mp4`|Output video|
-|Other files and folders|They either come with the project or are there for my testing and sandboxing purposes|
+|Other files and folders|They either come with the project or are there for testing and sandboxing purposes|
 
 1. Camera Calibration: 
 ---
@@ -117,17 +117,44 @@ Here are some examples of my detected lane lines.
 2. Pipeline: Find Curvature and Position of Car Off-center
 ---
 
+_Scripts:_ `myImageProcessing.py` (Line 204-378), `myLaneDetection.py` (Line 28-33)
+
+My `findCurvature` function can be broken down into three larger steps:  
+
+1. Gather the x and y coordinates of the pixels belonging to each lane, update them accordingly in my Line class object.  
+2. Determine the fitted x for each lane, update `fx`, `detected`, `bestx`, `coeffs`, and `best_fit` in my Line class object for each lane.  
+3. Calculate curvature, r squared, and offcenter in meters.  
+
+Step 1 is straightforward except in the cases where there are too few points to fit a polynomial. When that happens, I use the previous frame's fitted x for those problematic lanes.  
+
+Step 2 has quite some conditions built in to check if the detected curvature is actually correct. Not only do I check that the distances between the left and right fitted x have a mean value between `5.4/16 * 1280` and `6.5/16 * 1280`, but I also check that the distances have a small variance/standard deviation because low variance/standard deviation suggests that they take on a flat even distribution without unwanted spikes.  
+
+When the distance between my left and right lane pixels do not pass muster with my criteria, I go on to determine which one of them is a better one to trust and offset it by the width of the road to guess the other lane. To do this, I compare my fitted x for each lane with the previous frame's fitted x, whichever lane with a smaller standard deviation/variance gets picked as the better lane to trust because it is more similar to the lane found in the previous frame. Despite everything, if the fitted lane is indeed a good fit, with a R squared value less than 2 in my code, I make the exception and use it. This takes care of cases where my criteria are too strigent for a correct lane detected.  
+
+Step 3 makes use of the code snippets available in the coursework to calculate curvature in radius. I calculate my offcenter by extracting the lowest x coordinates on both lanes, average them, compare them to the midpoint of the frame, and scale the distance between the two in meters. Positive offcenter values suggest that the car is slightly to the right of the center line of the frame, and negative values suggest that the car is slightly to the left of the center line.  
+
+I sliced and diced my code to create the visual below (details in `myDiagosis-Copy1.ipynb`). A sequence of eight images as they occur in the video are selected and curvature and offcenter calculation were performed on them.  
 
 ![image7](./output_images/curvature_offcenter.png)
 
 2. Pipeline: Warping
 ---
 
+_Scripts:_ `myImageProcessing.py` (Line 381-398), `myLaneDetection.py` (Line 36)
+
+
+
 2. Pipeline: Assemble Diagnostic Screen
 ---
 
+_Scripts:_ `myImageProcessing.py` (Line 401-422), `myLaneDetection.py` (Line 39-41)
+
 3. Pipeline: Video
 ---
+
+_Scripts:_ `myLaneDetection.py`
+
+
 
 4. Discussion
 ---
