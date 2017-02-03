@@ -37,9 +37,9 @@ Here is an example of an undistorted chessboard image.
 2. Pipeline: Undistort
 ---
 
-_Scripts:_ `myImageProcessing.py`, `myLaneDetection.py`
+_Scripts:_ `myLaneDetection.py` (Line 17) 
 
-This is a straightforward step. Once I reload my camera calibration matrix and distortion coefficients (Line 19-21 `./output/myCalibration.p`), I make use of `opencv`'s `undistort` function to undistort a lane image (Line 17 `myLaneDetection.py`).
+This is a straightforward step. Once I load my camera calibration matrix and distortion coefficients (Line 19-21 `./output/myCalibration.p`), I make use of `opencv`'s `undistort` function to undistort a lane image.
 
 Here is an example of an undistorted lane image. 
 
@@ -48,8 +48,30 @@ Here is an example of an undistorted lane image.
 2. Pipeline: Color and Gradient Thresholding
 ---
 
+_Scripts:_ `myImageProcessing.py` (Line 29-63), `myLaneDetection.py` (Line 20)
+
+I use three sets of thresholding conditions on the original lane color images.  
+
+1. Gradient changes in the x direction between 20 and 100.  
+2. S channel values in HLS color channels between 170 and 255.  
+3. Yellow and white colors in RGB color channels, where R > 180, G > 180, and B < 155.  
+
+Here are some examples of my binary thresholded images. 
+
+![image3](./output_images/binary_thresholded.png)
+
 2. Pipeline: Perspective Transform
 ---
+
+_Scripts:_ `myCameraCalibration.py` (Line 51, 53, 56), `myImageProcessing.py` (Line 67-71)
+
+I handpicked four source points that roughly formed an isosceles trapezoid in the original 3D lane image, labeled with pink crosses below, and defined their destination points on a 2D image plane.   
+
+![image4](./output_images/perspective_transform_src.png)
+
+I confirmed my choices for the source and destination points after all the warped lane images showed somewhat satisfactory parallel lane lines.  
+
+![image5](./output_images/perspective_transformed.png)
 
 2. Pipeline: Slidng Window Method
 ---
