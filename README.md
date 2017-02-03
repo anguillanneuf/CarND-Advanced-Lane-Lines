@@ -2,7 +2,7 @@
 [![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
 
 
-In this project, my goal is to write a software pipeline to identify the lane boundaries in a video.  
+In this project, my goal is to write a software pipeline to identify the lane boundaries in a video. 
 
 Project Breakdown:
 ---
@@ -100,7 +100,7 @@ I confirmed my choices for the source and destination points after all the warpe
 
 _Scripts:_ `myImageProcessing.py` (Line 75-200), `myLaneDetection.py` (Line 26)
 
-This is probably the part of the project where I have spent most time on because it is challenging to always detect lane lines correctly. I rely on two functions to do my job properly. They are `find_lane_start` and `sliding_window_method`. Here is roughly how they work. Detailed comments can be found in the script.  
+This is probably the part of the project where I have spent most time on because it is challenging to always detect lane lines correctly. I rely on two functions to do my job properly. They are `find_lane_start` and `sliding_window_method`. Here is roughly how they work. Detailed comments can be found in the scripts.  
 
 The warped image from the previous step gets passed into my `sliding_window_method` function with the default sliding window size set to be (128, 72). If both the left and right lane lines are detected in the previous frame, searching of lanes in the current frame starts where the lanes in the previous frame start. _Side note: alternatively, I can create a region of interest using the lane information from the previous frame or frames._  In all other cases, if only one lane was detected and not the other in the previous frame, I set the starting point of my search for the detected lane where the previously found lane is, and use a custom function to locate a good starting point for my search; if neither lanes were detected in the previous frame, a full-blown search gets kicked off.  
 
@@ -125,11 +125,11 @@ My `findCurvature` function can be broken down into three larger steps:
 2. Determine the fitted x for each lane, update `fx`, `detected`, `bestx`, `coeffs`, and `best_fit` in my Line class object for each lane.  
 3. Calculate curvature, r squared, and offcenter in meters.  
 
-Step 1 is straightforward except in the cases where there are too few points to fit a polynomial. When that happens, I use the previous frame's fitted x for those problematic lanes.  
+Step 1 is straightforward except in cases where there are too few points to fit a polynomial. When that happens, I use the previous frame's fitted x for those problematic lanes.  
 
 Step 2 has quite some conditions built in to check if the detected curvature is actually correct. Not only do I check that the distances between the left and right fitted x have a mean value between `5.4/16 * 1280` and `6.5/16 * 1280`, but I also check that the distances have a small variance/standard deviation because low variance/standard deviation suggests that they take on a flat even distribution without unwanted spikes.  
 
-When the distance between my left and right lane pixels do not pass muster with my criteria, I go on to determine which one of them is a better one to trust and offset it by the width of the road to guess the other lane. To do this, I compare my fitted x for each lane with the previous frame's fitted x, whichever lane with a smaller standard deviation/variance gets picked as the better lane to trust because it is more similar to the lane found in the previous frame. Despite everything, if the fitted lane is indeed a good fit, with a R squared value less than 2 in my code, I make the exception and use it. This takes care of cases where my criteria are too strigent for a correct lane detected.  
+When the distance between my left and right lane pixels do not pass muster with my criteria, I go on to determine which one of them is a better one to trust and **offset it by the average width of the road in the past five frames** to guess the other lane. To do this, I compare my fitted x for each lane with the previous frame's fitted x, whichever lane with a smaller standard deviation/variance gets picked as the better lane to trust because it is more similar to the lane found in the previous frame. Despite everything, if the fitted lane is indeed a good fit, with a R squared value less than 2 in my code, I make the exception and use it. This takes care of cases where my criteria are too strigent for a correct lane detected.  
 
 Step 3 makes use of the code snippets available in the coursework to calculate curvature in radius. I calculate my offcenter by extracting the lowest x coordinates on both lanes, average them, compare them to the midpoint of the frame, and scale the distance between the two in meters. Positive offcenter values suggest that the car is slightly to the right of the center line of the frame, and negative values suggest that the car is slightly to the left of the center line.  
 
@@ -137,26 +137,43 @@ I sliced and diced my code to create the visual below (details in `myDiagosis-Co
 
 ![image7](./output_images/curvature_offcenter.png)
 
-2. Pipeline: Warping
+2. Pipeline: Unwarping
 ---
 
 _Scripts:_ `myImageProcessing.py` (Line 381-398), `myLaneDetection.py` (Line 36)
 
+This step makes use of the detected lanes in the previous step as well as the inverse of the perspective transform matrix `Minv` to unwarped the image. 
 
+![image8](./output_images/unwarped.png)
 
 2. Pipeline: Assemble Diagnostic Screen
 ---
 
 _Scripts:_ `myImageProcessing.py` (Line 401-422), `myLaneDetection.py` (Line 39-41)
 
+Thanks to [John Chen's suggestion of making a diagnostic screen](https://goo.gl/j0LZnS) in the class forum, I also stacked different stages in my pipeline into a diagnostic screen.  
+
+![image9](./output_images/pipeline_full.png)
+
 3. Pipeline: Video
 ---
 
-_Scripts:_ `myLaneDetection.py`
+On YouTube: https://youtu.be/bAOgVgrM5Y8  
 
+In here: `project_video_output.mp4`  
 
 
 4. Discussion
 ---
 
- 
+*I already know that my pipeline could fail on the harder challenge video because of the way I define my left and right lane pixels. Right now, I have it set up so that any detected lane pixels on the left pane of the image belong to my left lane, and the same for the my right lane.* This, however, won't be true for that video, where the lanes should shift panes when the road comes to a sharp bend.  
+
+I can address this problem by masking a region of interest (ROI) based on lanes found in the previous frames. That way, my left lane could cross into the right pane, and my right lane left, and I could also avoid using a sliding window search.  
+
+I tried my code on the first challenge video. *Judging from the result, I realized that my pipeline would need a good first frame to kickstart things properly.* In the diagnostic screen below, the lane line pixels colored red and blue don't look too bad, but the right fit is curving in the wrong direction (because of a white blob on the very top of the image), and my left lane went all the way to edge of the perspective transformed image. This is due to `nan` values of my best fitted x, which is absent for the first frame.  
+
+![image10](./output_images/bad_example.jpeg)  
+
+After I fixed that issue, more other issues came up. For instance, the width of the road seemed narrower than the project video, and the difference in the cement of the road confused my model as to which lane line shall be trusted. The only ways I can think of now to fix that are perhaps, first, re-do my camera calibration and make sure the road widths don't vary too much from one road to another road, then, re-experiment with different thresholding criteria, and lastly, instead of averaging over the past five frames, try more frames.  
+
+*After-thought: This is the first time that I have ever employed python Class objects in a project. I had to make it work by creating some global variables. There must be other better ways to do it that I'm not aware of. I'm glad that I got everything to work as I needed them to for the project video so I can wrap up for now. But I will keep an eye out for how others accomplish similar tasks by using those class objects differently!*
