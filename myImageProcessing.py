@@ -269,10 +269,11 @@ def findCurvature(lane_slidingwindowed, y_arr=y_arr):
     right_fitx = calcFitx(y_arr, right_fit)
     
 
-    # If the distance between the left and right lane are consistent (small std)
-    if(np.std(abs(left_fitx - right_fitx))) < 500 and \
-      (np.mean(abs(left_fitx - right_fitx))) > w*(5.5/16) and \
-      (np.mean(abs(left_fitx - right_fitx))) < w*(6.3/16):
+    # If the distance between the left and right lane are consistent
+    # and the distance makes sense. 
+    if(np.std(abs(left_fitx - right_fitx))) < 600 and \
+      (np.mean(abs(left_fitx - right_fitx))) > w*(5.4/16) and \
+      (np.mean(abs(left_fitx - right_fitx))) < w*(6.5/16):
           
         L.fx.append(left_fitx)
         R.fx.append(right_fitx)
@@ -287,7 +288,7 @@ def findCurvature(lane_slidingwindowed, y_arr=y_arr):
     else: 
         left_bestx = np.mean(np.array(L.fx), axis=0)
         right_bestx = np.mean(np.array(R.fx), axis=0)
-        w_road = np.clip(np.mean(left_bestx - right_bestx), w*5.9/16, w*6.3/16)
+        w_road = np.clip(np.mean(left_bestx - right_bestx), w*5.9/16, w*6.5/16)
         # If the left lane is a better fit. 
 
         # diagnosis
@@ -297,20 +298,34 @@ def findCurvature(lane_slidingwindowed, y_arr=y_arr):
         if np.std(abs(left_bestx - left_fitx)) < np.std(abs(right_bestx - right_fitx)):
             L.fx.append(left_fitx)
             L.detected = True
-            R.fx.append(left_fitx + w_road)
-            rightx = L.fx[-1]; righty = y_arr
-            R.detected = False
             L.coeffs = left_fit
             L.best_fit.append(L.coeffs)
+            
+            
+            # despite everything, if the fit found is a good fit, use it. 
+            if calcR2(righty, rightx, right_fit) < 2:
+                R.fx.append(left_fitx + w_road)
+                rightx = R.fx[-1]; righty = y_arr
+                R.detected = False
+            else: 
+                R.fx.append(right_fitx)
+                R.detected = True
+
 
         else: 
             R.fx.append(right_fitx)
             R.detected = True
-            L.fx.append(right_fitx - w_road)
-            leftx = L.fx[-1]; lefty = y_arr
-            L.detected = False
             R.coeffs = right_fit
             R.best_fit.append(R.coeffs)
+            
+             
+            if calcR2(lefty, leftx, left_fit) < 2:
+                L.fx.append(right_fitx - w_road)
+                leftx = L.fx[-1]; lefty = y_arr
+                L.detected = False
+            else: 
+                L.fx.append(left_fitx)
+                L.detected = True
             
         
 
