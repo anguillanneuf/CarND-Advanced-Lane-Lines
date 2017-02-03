@@ -23,6 +23,21 @@ Project Breakdown:
 
 4. Discussion  
 
+Files and Folders Used In the Project:
+---
+|Name|Description|
+|---|---|
+|`/camera_cal`|Chessboard images for camera calibration|
+|`/output/calibration.p`|Camera calibration, distortion coefficients, perspective transform matrix and its inverse|
+|`/output_images/`|Images used in READ.ME|
+|`myCameraCalibration.py`|Code for camera calibration|
+|`myImageProcessing.py`|Majority of the functions used for the pipeline|
+|`myLaneDetection.py`|Main function of the project that reads in input video and outputs the lane-detected video|
+|`myLineComponents.py`|Definition of class `Line`|
+|`project_video.mp4`|Raw video|
+|`project_video_output.mp4`|Output video|
+|Other files and folders|They either come with the project or are there for my testing and sandboxing purposes|
+
 1. Camera Calibration: 
 ---
 
@@ -91,7 +106,7 @@ The warped image from the previous step gets passed into my `sliding_window_meth
 
 I will explain `find_lane_start` next before I come back to `sliding_window_method`. `find_lane_start` gets passed the histogram information of the lower half of a warped lane image. It first tries to look for peaks that have a value greater than 4,500 pixels and a wavelength of (50, 100) pixels on the left and right panels. The latter is done using `scipy.signals.find_peaks_cwt`. If those peaks are found, I then assume that that true lane lines are the ones that are closer to the center line. If those peaks are not found, perhaps my criteria are too strigent for certain cases, and I will resort to simply finding the x-coordinates of the pinnacles in the histogram.  
 
-With information of where to start the search for the lane lines, I can draw my very first two sliding windows. In cases where the lanes are present in the first two sliding windows, the search moves upward, adjusting their positions based on where there is a higher concentration of pixels. However, there may still be cases where nothing is detected in the sliding windows, or they are in the wrong positions. For now, I can let that be. 
+With information of where to start the search for the lane lines, I can draw my very first two sliding windows. In cases where the lanes are present in the first two sliding windows, the search moves upward, adjusting their positions based on where there is a higher concentration of pixels. However, there may still be cases where nothing is detected in the sliding windows, or they are in the wrong positions. For now, I can let that be. This can later be fixed in my custom function `findCurvature`.
 
 During the search, I use standard deviation - which is tied to variance - to decide if what I see in a sliding window gives me good intel about the presence of a lane line. As I have noticed, points can spread every which way in certain sliding windows. This would force `signal.find_peaks_cwt` to analyze a flat line, resulting in very inaccurate suggestions of lane lines. Since I only feel confident to shift my sliding windows left and right when there is clear indication of a clean lane line, I set a condition to the standard deviation value of the pixels in the sliding window. Noisy dots results in very small variance/standard deviation, and clear lane lines results in very large variance/stardard deviation. Through trial and error, I found that 1000 for stardard deviation worked very well.  
 
@@ -101,6 +116,9 @@ Here are some examples of my detected lane lines.
 
 2. Pipeline: Find Curvature and Position of Car Off-center
 ---
+
+
+![image7](./output_images/curvature_offcenter.png)
 
 2. Pipeline: Warping
 ---
