@@ -46,7 +46,7 @@ def process_image(lane_img):
 
 def main():
     
-    project_video_output_fname = 'project_video_output.mp4'
+    project_video_output_fname = 'project_video_output-test.mp4'
     clip1 = VideoFileClip("project_video.mp4")
     project_video_output = clip1.fl_image(process_image)
     project_video_output.write_videofile(project_video_output_fname, 

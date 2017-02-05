@@ -49,6 +49,7 @@ def main():
  
     
     src = np.float32([[595,450],[689,450],[1060,690],[250,690]])
+    #src = np.float32([[585,460],[695,460],[1127,720],[203,720]])
     dst = np.float32([[w*5/16,0],[w*11/16,0],[w*11/16,h],[w*5/16,h]])
         
     # M is the perspective transform matrix; Minv is the inversed M. 
