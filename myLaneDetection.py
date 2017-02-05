@@ -23,22 +23,22 @@ def process_image(lane_img):
     lane_warped = I.warping(lane_thresholded)
     
     # diag4
-    lane_slidingwindowed = I.sliding_window_method(lane_warped)
+    left_lane_pts, right_lane_pts = I.findLanePoints(lane_warped)
+    lane_pts = cv2.bitwise_or(left_lane_pts, right_lane_pts)
     
-    lx,rx,ly,ry,lfx,rfx,lc,rc,lr2,rr2,oc= I.findCurvature(lane_slidingwindowed)
+    
+    lx,rx,ly,ry,lfx,rfx,lc,rc,lr2,rr2,oc= I.findCurvature(left_lane_pts, right_lane_pts)
     info = {'lc':lc, 'rc': rc, 'lr2':lr2, 'rr2': rr2, 'oc': oc}
-    
     
     # diag5
     lane_detected = I.drawCurves(lx, rx, ly, ry, lfx, rfx)
 
     # diag1 
-    lane_unwarped = I.unwarping(lane_dst, lane_slidingwindowed)
+    lane_unwarped = I.unwarping(lane_dst, lfx, rfx)
 
     # assemble diagnostic screens
-    diagScreen = I.createDiagScreen(lane_unwarped, lane_thresholded, 
-                                  lane_warped, lane_slidingwindowed*255,
-                                  lane_detected, info)
+    diagScreen = I.createDiagScreen(lane_unwarped, lane_thresholded*255, 
+                                    lane_warped*255, lane_pts*255, lane_detected, info)
     
     return diagScreen
  
@@ -46,11 +46,10 @@ def process_image(lane_img):
 
 def main():
     
-    project_video_output_fname = 'project_video_output-test.mp4'
+    project_video_output_fname = 'project_video_output.mp4'
     clip1 = VideoFileClip("project_video.mp4")
     project_video_output = clip1.fl_image(process_image)
-    project_video_output.write_videofile(project_video_output_fname, 
-                                         audio=False)
+    project_video_output.write_videofile(project_video_output_fname, audio=False)
 
     
 

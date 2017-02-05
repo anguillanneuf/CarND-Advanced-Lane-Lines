@@ -18,12 +18,16 @@ R = Line.Line()
 # load camera calibration matrix and distortion coefficients.   
 myCalibration = pickle.load(open("./output/myCalibration.p", "rb"))
 
+
 mtx, dist = myCalibration['mtx'], myCalibration['dist']
 M, Minv = myCalibration['M'], myCalibration['Minv']
 
+
 h,w,c = 720, 1280, 3
 
-y_arr = np.linspace(0, h, num = h+1) # array([0., 1., 2., ..., 720.])
+
+y_arr = np.linspace(0, h, num = h+1)[:-1] # array([0., 1., 2., ..., 720.])
+
 
 
 def thresholding(img, hls_thresh=(170,255), gradx_thresh=(20,100)):
@@ -71,7 +75,7 @@ def warping(img):
     
 
     
-def find_lane_start(histogram, which = 'both'):
+def find_lane_start(histogram, which = 'left'):
     '''
     `histogram`: an 1-D array that keeps track of the number of pixels with 
                  a value of 1 along the y-axis. 
@@ -86,8 +90,6 @@ def find_lane_start(histogram, which = 'both'):
     else:
         mid_left_start = np.clip(np.argmax(histogram[:int(w/2)]),0,639)
     
-        
-        
     right_peaks = signal.find_peaks_cwt(histogram[int(w/2):], np.arange(50,100))
     valid_right_peaks = [x for x in right_peaks if histogram[x+int(w/2)]>4500]
     
@@ -95,16 +97,14 @@ def find_lane_start(histogram, which = 'both'):
         mid_right_start = valid_right_peaks[0]+int(w/2)
     else:
         mid_right_start = np.clip(np.argmax(histogram[int(w/2):])+int(w/2),640,1279)
-    
         
     # Returns the x-coordinates of the lanes at the bottom of an image.
     if which == 'left': 
-        return mid_left_start
+        return int(mid_left_start)
     elif which == 'right':
-        return mid_right_start
-    else:
-        return mid_left_start, mid_right_start
+        return int(mid_right_start)
 
+    
 def update_mx_from_histogram(bbox=None, mx=None, δh=64, d='left', y=None):
     global L
     global R
@@ -119,20 +119,19 @@ def update_mx_from_histogram(bbox=None, mx=None, δh=64, d='left', y=None):
 
     # np.std(np.array([3,3,3,3,3,3,3,3,3,3])) = 0.0
     # np.std(np.array([0,27,0,0,0,0,0,0,0,0])) = 8.1
-    # print("hist var: {}".format(np.var(hist)))
     
-    if np.var(hist) > 10: 
+    if np.var(hist) > 100: 
         xvals = np.where(bbox == 1)[1]
         yvals = np.where(bbox == 1)[0]
     
         if np.sum(bbox==1)>10:
             fit = np.polyfit(yvals, xvals, 2)
-            print("fit[2]: {}".format(fit[2]))
+            
             if d=='left':
                 mx = int(np.clip(mx-δh+fit[2], 0, w/2-1))
             else:
                 mx = int(np.clip(mx-δh+fit[2], w/2, w-1))
-            print(mx)
+            
         else:
             if d=='left':
                 mx = L.fx[-1][y]
@@ -142,9 +141,11 @@ def update_mx_from_histogram(bbox=None, mx=None, δh=64, d='left', y=None):
         mx = L.fx[-1][y] if d=='left' else R.fx[-1][y]
       
     return int(mx)
+
     
     
-def sliding_window_method(warped, δh=64, δv=72):
+
+def slidingWindowMethod(lane_warped, δh=64, δv=72, which='left'):
     '''
     `warped`: perspective transformed image.
     `δh`: the width of the sliding window divided by 2.
@@ -156,61 +157,118 @@ def sliding_window_method(warped, δh=64, δv=72):
     global L
     global R
     
-    # STEP 1: Find where to start the search. Return `mlx`, `mrx`. 
+    # Let y be 720. As sliding windows travel upward, y decreases. 
+    y = h
+    
+    # Create a blank image. 
+    lane_pts = np.zeros_like(lane_warped)
+    
+    # Find where to start the search. Return `mlx`, `mrx`. 
+    histogram = np.sum(lane_warped[int(w/2):, :], axis=0)
+    
+    if which=='left':
+        mlx = find_lane_start(histogram, 'left')
+
+        while y > 0:
+            
+            # Zoom into the left sliding windows. 
+            # Clip them using the left, center, and right vertical lines. 
+            bbox_left = lane_warped[(y-δv):y, np.clip((mlx-δh),0,639):np.clip((mlx+δh),0,639)]
+           
+            # Update `lane_pts` based on sliding windows, where pixel values>0.  
+            lane_pts[(y-δv):y, np.clip((mlx-δh),0,639):np.clip((mlx+δh),0,639)][(bbox_left>0)] = 1
+
+            # Shift sliding window upward until it hits the top of the image. 
+            y -= δv
+
+            mlx = update_mx_from_histogram(bbox_left, mlx, δh, 'left', y)
+    
+    else:
+        mrx = find_lane_start(histogram, 'right')
+
+        while y > 0:
+            
+            bbox_right = lane_warped[(y-δv):y, np.clip((mrx-δh),640,1279):np.clip((mrx+δh),640,1279)]
+            
+            lane_pts[(y-δv):y, np.clip((mrx-δh),640,1279):np.clip((mrx+δh),640,1279)][(bbox_right>0)] = 1
+            
+            y -= δv
+            
+            mrx = update_mx_from_histogram(bbox_right, mrx, δh, 'right', y)
+        
+    return lane_pts
+    
+    
+    
+
+def maskingMethod(lane_warped, fx):
+    '''
+    Use the last fitted lane line to create a mask on the new image, using a band of width 128.
+    
+    '''
+    mask = np.zeros_like(lane_warped)
+    
+    pts_left = np.array([np.transpose(np.vstack([fx-64,y_arr]))])
+    fx_ = fx+64
+    pts_right = np.array([np.transpose(np.vstack([fx_[::-1],y_arr[::-1]]))])
+    pts = np.hstack((pts_left, pts_right))
+
+    #filling pixels inside the polygon defined by "vertices" with the fill color 255    
+    cv2.fillPoly(mask, np.int_([pts]), 1)
+    
+    #returning the image only where mask pixels are nonzero
+    masked_image = cv2.bitwise_and(lane_warped, mask)
+    
+    return masked_image
+
+    
+    
+    
+def findLanePoints(lane_warped):
+    '''
+    Use either the sliding window method or the masking method to find lane points. 
+    Returns left line points and right lane points separately. 
+    
+    '''
+    
+    # Global variables of class Line. 
+    global L
+    global R
     
     # If both left and right lanes are detected. 
     if np.logical_and(L.detected, R.detected):
+        
         # Use fitted x from the previous frame. 
-        mlx, mrx = L.fx[-1][-1].astype(int), R.fx[-1][-1].astype(int)
+        left_lane_pts = maskingMethod(lane_warped, L.fx[-1])
+        right_lane_pts = maskingMethod(lane_warped, R.fx[-1])
+        
     
     # All other cases. 
     else: 
-        histogram = np.sum(warped[int(warped.shape[0]/2):, :], axis=0)
         
         # If either the left or the right lane is detected but not both.
         if np.logical_xor(L.detected, R.detected):
         
             if L.detected:
-                mlx = L.fx[-1][-1].astype(int)
-                mrx = find_lane_start(histogram, 'right')
-            else: 
-                mrx = R.fx[-1][-1].astype(int)
-                mlx = find_lane_start(histogram, 'left')
-
+                left_lane_pts = maskingMethod(lane_warped, L.fx[-1])
+                #right_lane_pts = slidingWindowMethod(lane_warped, which='right')
+                right_lane_pts = maskingMethod(lane_warped, R.fx[-1])
+                
+            else:
+                right_lane_pts = maskingMethod(lane_warped, R.fx[-1])
+                #left_lane_pts = slidingWindowMethod(lane_warped, which='left')
+                left_lane_pts = maskingMethod(lane_warped, L.fx[-1])
+                
+                
         # If neither the left nor the right lanes are detected. 
         else: 
+            
             # Find the centers of the first two sliding windows. 
-            mlx, mrx = find_lane_start(histogram, 'both')        
+            left_lane_pts = slidingWindowMethod(lane_warped, which='left')
+            right_lane_pts = slidingWindowMethod(lane_warped, which='right')
+            
     
-    # STEP 2: Search Upward. Update `mlx` and `mrx`. 
-    
-    # Let y be 720. As sliding windows travel upward, y decreases. 
-    y = h
-    
-    # Create a blank image. 
-    lane_pts = np.zeros_like(warped)
-
-    while y > 0:
-        # Zoom into the left and right sliding windows. 
-        # Clip them using the left, center, and right vertical lines. 
-        bbox_left = warped[(y-δv):y, np.clip((mlx-δh),0,639):np.clip((mlx+δh),0,639)]
-        bbox_right = warped[(y-δv):y, np.clip((mrx-δh),640,1279):np.clip((mrx+δh),640,1279)]
-        
-        # Update `lane_pts` based on sliding windows, where pixel values>0.  
-        lane_pts[(y-δv):y, np.clip((mlx-δh),0,639):np.clip((mlx+δh),0,639)][(bbox_left>0)] = 1
-        lane_pts[(y-δv):y, np.clip((mrx-δh),640,1279):np.clip((mrx+δh),640,1279)][(bbox_right>0)] = 1
-        
-        # Shift sliding window upward until it hits the top of the image. 
-        y -= δv
-               
-        mlx = update_mx_from_histogram(bbox_left, mlx, δh, 'left', y)
-        mrx = update_mx_from_histogram(bbox_right, mrx, δh, 'right', y)
-        
-    return lane_pts
-    
-
-def maskingMethod(lane_img):
-    return lane_pts
+    return left_lane_pts, right_lane_pts
     
     
 # Calculate R squared of a fit.
@@ -237,33 +295,23 @@ def calcCurv(v, fit):
   
 
 
-def findCurvature(lane_slidingwindowed, y_arr=y_arr):
-    '''
-    `lane_slidingwindowed`: this is the most clean version of the bird's eye 
-                            view of the lane lines. 
-                            
-    '''
+def findCurvature(left_lane_pts, right_lane_pts, y_arr=y_arr):
     global L
     global R
-    
-    # Gather the x and y coordinates of the pixels belonging to the lane lines.
-    xvals = np.where(lane_slidingwindowed == 1)[1]
-    yvals = np.where(lane_slidingwindowed == 1)[0]
 
-    
     # STEP 1: update L.allx and R.allx
-    
-    # Group the coordinates into left and right lanes. 
-    leftx,lefty = xvals[xvals<=w/2],yvals[xvals<=w/2]
-    rightx,righty = xvals[xvals>w/2],yvals[xvals>w/2]
+    leftx = np.where(left_lane_pts == 1)[1]
+    lefty = np.where(left_lane_pts == 1)[0]
+    rightx = np.where(right_lane_pts == 1)[1]
+    righty = np.where(right_lane_pts == 1)[0]
     
     # If there are too few points to fit a polynomial, use the last fitted x 
-    if len(xvals<=w/2)<10:
-        leftx=np.mean(np.array(L.fx), axis=0)#L.fx[-1]
+    if len(leftx)<10:
+        leftx=L.fx[-1] #np.mean(np.array(L.fx), axis=0)#
         lefty= y_arr
         
-    if len(xvals>w/2)<10:
-        rightx = np.mean(np.array(R.fx), axis=0)#R.fx[-1]
+    if len(rightx)<10:
+        rightx = R.fx[-1]#np.mean(np.array(R.fx), axis=0)#
         righty = y_arr
     
     L.allx = leftx; L.ally = lefty
@@ -280,13 +328,11 @@ def findCurvature(lane_slidingwindowed, y_arr=y_arr):
     right_fit = np.polyfit(R.ally, R.allx, 2)
     right_fitx = calcFitx(y_arr, right_fit)
     
-
+    # print('std left-right: {}\nmean: {}'.format(np.std(abs(left_fitx - right_fitx)), np.mean(abs(left_fitx - right_fitx))))
+    
     # If the distance between the left and right lane are consistent
     # and the distance makes sense. 
-    if(np.std(abs(left_fitx - right_fitx))) < 800 and \
-      (np.mean(abs(left_fitx - right_fitx))) > w*(5.5/16) and \
-      (np.mean(abs(left_fitx - right_fitx))) < w*(6.5/16):
-          
+    if len(L.fx) <1 or len(R.fx) < 1: 
         L.fx.append(left_fitx)
         R.fx.append(right_fitx)
         L.detected = True
@@ -294,54 +340,79 @@ def findCurvature(lane_slidingwindowed, y_arr=y_arr):
         L.coeffs = left_fit
         R.coeffs = right_fit
         L.best_fit.append(L.coeffs)
-        R.best_fit.append(R.coeffs)
         
-    # If the distance is not consistent, must decide which lane is better. 
+        
     else: 
-        # Determine the width of the road from the previous five frames. 
-        # L.fx is a deque list. 
-        left_bestx = np.mean(np.array(L.fx), axis=0)
-        right_bestx = np.mean(np.array(R.fx), axis=0)
-        w_road = (left_bestx - right_bestx)
-        
-        # If the left lane is a better fit. 
-        # diagnosis
-        # print(np.std(abs(left_bestx - left_fitx)))
-        # print(np.std(abs(right_bestx - right_fitx)))
 
-        if np.std(abs(left_bestx - left_fitx)) < np.std(abs(right_bestx - right_fitx)):
+        if np.std(abs(left_fitx - L.fx[-1])) < 20 and np.std(abs(right_fitx-R.fx[-1])) < 20 and \
+           np.sum((right_fitx-left_fitx) < w*(5.5/16)) + np.sum((right_fitx-left_fitx) > w*(7/16)) < h/6:
+       
             L.fx.append(left_fitx)
-            L.detected = True
-            L.coeffs = left_fit
-            L.best_fit.append(L.coeffs)
-            
-            
-            # despite everything, if the fit found is a good fit, use it. 
-            if calcR2(righty, rightx, right_fit) < 1:
-                R.fx.append(left_fitx - w_road)
-                rightx = R.fx[-1]; righty = y_arr
-                R.detected = False
-            else: 
-                R.fx.append(right_fitx)
-                R.detected = True
-
-
-        else: 
             R.fx.append(right_fitx)
+            L.detected = True
             R.detected = True
+            L.coeffs = left_fit
             R.coeffs = right_fit
+            L.best_fit.append(L.coeffs)
             R.best_fit.append(R.coeffs)
             
-             
-            if calcR2(lefty, leftx, left_fit) < 1:
-                L.fx.append(right_fitx + w_road)
-                leftx = L.fx[-1]; lefty = y_arr
-                L.detected = False
-            else: 
+        # If the distance is not consistent, must decide which lane is better. 
+        else: 
+            L.detected = False; R.detected = False
+            
+            # Determine the width of the road from the previous frames.
+            left_bestx = np.mean(np.array(L.fx), axis=0)
+            right_bestx = np.mean(np.array(R.fx), axis=0)            
+            w_road = (L.fx[-1]-R.fx[-1])
+
+            
+            lr2 = calcR2(lefty, leftx, left_fit)
+            rr2 = calcR2(righty, rightx, right_fit)
+            
+            # If the left lane is a better fit with conditions:
+                # 1. smaller standard deviation comparing current fitted x with previous best fitted x
+                # 2. better r squared than the other
+                # 3. r squared is reasonably good 
+            if np.std(abs(left_bestx - left_fitx)) < np.std(abs(right_bestx - right_fitx)) and \
+            lr2 > rr2 and lr2 <= 1 and lr2 >= 0:
+                
                 L.fx.append(left_fitx)
                 L.detected = True
+                L.coeffs = left_fit
+                L.best_fit.append(L.coeffs)
             
-        
+                # despite everything, if any of the conditions below is true, don't use it
+                # 1. r squared is not reasonable
+                # 2. offset by more than 64 pixels on either end of the fitted lanes 
+                if rr2 > 1 or rr2 < 0 or abs(right_fitx[0] - R.fx[-1][0]) > 64 or \
+                abs(right_fitx[-1] - R.fx[-1][-1]) > 64:
+                    R.fx.append(left_fitx - w_road)
+                    rightx = R.fx[-1]; righty = y_arr
+                    R.detected = False
+                # else, use it. 
+                else: 
+                    R.fx.append(right_fitx)
+                    R.detected = True
+                
+            # vice versa. 
+            elif np.std(abs(left_bestx - left_fitx)) > np.std(abs(right_bestx - right_fitx)) and \
+            rr2 > lr2 and rr2 <= 1 and rr2 > 0:
+                
+                R.fx.append(right_fitx)
+                R.detected = True
+                R.coeffs = right_fit
+                R.best_fit.append(R.coeffs)
+                
+                if lr2 > 1 or lr2 < 0 or abs(left_fitx[0] - L.fx[-1][0]) > 64 or \
+                abs(left_fitx[-1] - L.fx[-1][-1]) > 64:
+                    L.fx.append(right_fitx + w_road)
+                    leftx = L.fx[-1]; lefty = y_arr
+                    L.detected = False
+                else: 
+                    L.fx.append(left_fitx)
+                    L.detected = True   
+                    
+
 
     # STEP 3: update L.r2, R.r2, L.c, R.c, L.oc, R.oc
     
@@ -369,21 +440,19 @@ def findCurvature(lane_slidingwindowed, y_arr=y_arr):
     L.oc = offcenter
     R.oc = offcenter
     
-    lfx = np.mean(np.array(L.fx), axis=0)
-    rfx = np.mean(np.array(R.fx), axis=0)
+    # L.fx and R.fx may have a minimum length of 1. 
+    lfx = np.mean(np.array(L.fx), axis=0).astype(int) if len(L.fx) > 1 else L.fx[-1].astype(int)
+    rfx = np.mean(np.array(R.fx), axis=0).astype(int) if len(R.fx) > 1 else R.fx[-1].astype(int)
     
     return (L.allx, R.allx, L.ally, R.ally, lfx, rfx, L.c, R.c, L.r2, R.r2, L.oc)
 
     
-def drawCurves(lx, rx, ly, ry, lfx, rfx):
-    
-
-    
+def drawCurves(lx, rx, ly, ry, lfx, rfx):    
     lane_detected = np.zeros((h,w,c))
     
     lane_detected[:,:,0][np.clip(ly.astype(int),0,719), np.clip(lx.astype(int),0,1279)] = 255
     
-    lane_detected[:,:,1][np.hstack([y_arr-1]*10).astype(int), \
+    lane_detected[:,:,1][np.hstack([y_arr]*10).astype(int), \
     np.clip(np.hstack([lfx-2,lfx-1,lfx,lfx+1,lfx+2,rfx-2,rfx-1,rfx,
                        rfx+1,rfx+2]).astype(int),1,1279)] = 255
     
@@ -392,19 +461,18 @@ def drawCurves(lx, rx, ly, ry, lfx, rfx):
     return lane_detected
 
 
-def unwarping(lane_dst, lane_slidingwindowed):
-    # Find curvature.
-    lx,rx,ly,ry,lfx,rfx,lc,rc,lr2,rr2,oc = findCurvature(lane_slidingwindowed)
+def unwarping(lane_dst, lfx, rfx):
     
-    warp_zero = np.zeros_like(lane_slidingwindowed)
-    color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+    color_warp = np.zeros_like(lane_dst)
     
     # Draw a polygon using the fitted x and y values.
     pts_left = np.array([np.transpose(np.vstack([lfx,y_arr]))])
+    
     pts_right = np.array([np.transpose(np.vstack([rfx[::-1],y_arr[::-1]]))])
     pts = np.hstack((pts_left, pts_right))
-    cv2.fillPoly(color_warp, np.int_([pts]),(0,255,0))
 
+    cv2.fillPoly(color_warp, np.int_([pts]),(0,255,0))
+    
     # Unwarp and overlay. 
     lane_unwarped = cv2.warpPerspective(color_warp, Minv, (w,h))
     lane_overlayed = cv2.addWeighted(lane_dst, 1, lane_unwarped, 0.3, 0)
