@@ -102,11 +102,13 @@ _Scripts:_ `myImageProcessing.py` (Line 78-271), `myLaneDetection.py` (Line 26-2
 
 This is the part of the project where I have spent most time on because it is challenging to always detect lane lines correctly. I rely on five functions to do my job properly. Here is roughly how they work. Detailed comments can be found in the scripts.  
 
-`findLanePoints`: This is where the main logic of my approach sits. If a lane is not detected in the previous frame, use a sliding window method. If a line is detected, use a masking method.  
-`maskingMethod`: Use the last fitted lane line to create a region of interest and mask the thresholded image to find lane points.  
-`slidingWindowMethod`: Use histograms and sliding windows to search for lane points from the bottom of an image to the top.  
-`find_lane_start`: Supports `slidingWindowMethod`, calculate where to start the search. 
-`update_mx_from_histogram`: Also Supports `slidingWindowMethod`, calculate and update the new midpoint on the x-axis for the next bounding box.  
+|Function|Description|
+|---|---|
+|`findLanePoints`|This is where the main logic of my approach sits. If a lane is not detected in the previous frame, use a sliding window method. If a line is detected, use a masking method. |
+|`maskingMethod`|Use the last fitted lane line to create a region of interest and mask the thresholded image to find lane points.|  
+|`slidingWindowMethod`|Use histograms and sliding windows to search for lane points from the bottom of an image to the top.| 
+|`find_lane_start`|Supports `slidingWindowMethod`, calculate where to start the search.|
+|`update_mx_from_histogram`|Also Supports `slidingWindowMethod`, calculate and update the new midpoint on the x-axis for the next bounding box.|
 
 The warped image from the previous step gets passed to my `findLanePoints` function. It decides whether to use a sliding window method or a masking method on this warped image based on whether lanes have been detected in the previous frame.  
 
@@ -206,16 +208,17 @@ Thanks to [John Chen's suggestion of making a diagnostic screen](https://goo.gl/
 3. Pipeline: Video
 ---
 
-On YouTube (new one): https://youtu.be/BhJmE993Mgk
+On YouTube (new one): https://youtu.be/BhJmE993Mgk  
+
 In here: `project_video_output.mp4`  
 
-* On YouTube (old one): https://youtu.be/bAOgVgrM5Y8
+On YouTube (old one): https://youtu.be/bAOgVgrM5Y8
 
 4. Discussion 
 ---
 
 (Dated: Feb. 5, 2017)
-This is just an update from two days ago using an improved pipeline. There is some slight improvement from the worse first frame detection below. ; p
+This is just an update from two days ago using an improved pipeline. There is some slight improvement, but there still remains a lot to be done. 
 
 ![image11](./output_images/challenge_firstframe.jpeg) 
 
