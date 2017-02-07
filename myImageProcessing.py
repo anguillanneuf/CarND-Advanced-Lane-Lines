@@ -347,8 +347,12 @@ def findCurvature(left_lane_pts, right_lane_pts, y_arr=y_arr):
         if np.std(abs(left_fitx - L.fx[-1])) < 20 and np.std(abs(right_fitx-R.fx[-1])) < 20 and \
            np.sum((right_fitx-left_fitx) < w*(5.5/16)) + np.sum((right_fitx-left_fitx) > w*(7/16)) < h/6:
        
-            L.fx.append(left_fitx)
-            R.fx.append(right_fitx)
+            # this can be improved, left_fitx to be calculated from a weighted average of last frame's 
+            # polynomial and current frame's 
+            #L.fx.append(left_fitx)
+            L.fx.append(calcFitx(y_arr, L.coeffs*.4 + left_fit*.6))
+            #R.fx.append(right_fitx)
+            R.fx.append(calcFitx(y_arr, R.coeffs*.4 + right_fit*.6))
             L.detected = True
             R.detected = True
             L.coeffs = left_fit
@@ -376,7 +380,8 @@ def findCurvature(left_lane_pts, right_lane_pts, y_arr=y_arr):
             if np.std(abs(left_bestx - left_fitx)) < np.std(abs(right_bestx - right_fitx)) and \
             lr2 > rr2 and lr2 <= 1 and lr2 >= 0:
                 
-                L.fx.append(left_fitx)
+                #L.fx.append(left_fitx)
+                L.fx.append(calcFitx(y_arr, L.coeffs*.4 + left_fit*.6))
                 L.detected = True
                 L.coeffs = left_fit
                 L.best_fit.append(L.coeffs)
@@ -391,14 +396,16 @@ def findCurvature(left_lane_pts, right_lane_pts, y_arr=y_arr):
                     R.detected = False
                 # else, use it. 
                 else: 
-                    R.fx.append(right_fitx)
+                    #R.fx.append(right_fitx)
+                    R.fx.append(calcFitx(y_arr, R.coeffs*.4 + right_fit*.6))
                     R.detected = True
                 
             # vice versa. 
             elif np.std(abs(left_bestx - left_fitx)) > np.std(abs(right_bestx - right_fitx)) and \
             rr2 > lr2 and rr2 <= 1 and rr2 > 0:
                 
-                R.fx.append(right_fitx)
+                #R.fx.append(right_fitx)
+                R.fx.append(calcFitx(y_arr, R.coeffs*.4 + right_fit*.6))
                 R.detected = True
                 R.coeffs = right_fit
                 R.best_fit.append(R.coeffs)
@@ -409,7 +416,8 @@ def findCurvature(left_lane_pts, right_lane_pts, y_arr=y_arr):
                     leftx = L.fx[-1]; lefty = y_arr
                     L.detected = False
                 else: 
-                    L.fx.append(left_fitx)
+                    #L.fx.append(left_fitx)
+                    L.fx.append(calcFitx(y_arr, L.coeffs*.4 + left_fit*.6))
                     L.detected = True   
                     
 
